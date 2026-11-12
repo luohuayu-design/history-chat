@@ -7,13 +7,15 @@
    页面会自动多出一张人物卡片，聊天记录按 id 分开保存。
    ============================================================ */
 
-/* ---------------- 免费接口配置 ---------------- */
-const FREE_API = {
-  // 免 Key、可跨域调用的公共文本接口（OpenAI 兼容格式）
-  chatUrl: 'https://text.pollinations.ai/openai',
-  // 备用：纯文本接口，主接口失败时自动改用
-  plainUrl: 'https://text.pollinations.ai/',
-  model: 'openai',
+/* ---------------- 接口配置 ---------------- */
+const API_CONFIG = {
+  // 主通道：Cloudflare Pages 免费中转 → 智谱 GLM-4-Flash（约 1~2 秒）
+  proxyUrl: 'https://history-chat-proxy.pages.dev/',
+  // 备用通道：免 Key 的公共接口，主通道失败时自动改用（较慢，10 秒以上）
+  fallbackChatUrl: 'https://text.pollinations.ai/openai',
+  fallbackPlainUrl: 'https://text.pollinations.ai/',
+  fallbackModel: 'openai',
+  timeoutMs: 25000,
 };
 
 /* ---------------- 人物配置 ---------------- */
@@ -268,56 +270,84 @@ function updateSuggestions() {
   });
 }
 
-/* ---------------- 调用免费 AI 接口 ---------------- */
+/* ---------------- 调用 AI 接口 ---------------- */
+function fetchWithTimeout(url, options, ms) {
+  const ctrl = new AbortController();
+  const timer = setTimeout(() => ctrl.abort(), ms);
+  return fetch(url, { ...options, signal: ctrl.signal }).finally(() => clearTimeout(timer));
+}
+
 async function requestReply() {
   // 只带最近 12 条，控制长度
   const history = messages.slice(-12).map((m) => ({ role: m.role, content: m.content }));
-  const payload = [
-    { role: 'system', content: currentChar.persona },
-    ...history,
-  ];
+  const payload = [{ role: 'system', content: currentChar.persona }, ...history];
 
+  // 主通道：Cloudflare Pages 中转 → 智谱 GLM-4-Flash
   try {
-    const res = await fetch(FREE_API.chatUrl, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        model: FREE_API.model,
-        messages: payload,
-        referrer: location.hostname || 'github-pages',
-        private: true,
-      }),
-    });
+    const res = await fetchWithTimeout(
+      API_CONFIG.proxyUrl,
+      {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ messages: payload }),
+      },
+      API_CONFIG.timeoutMs
+    );
+    if (!res.ok) throw new Error('HTTP ' + res.status);
+    const data = await res.json();
+    const reply = data && data.reply;
+    if (reply && reply.trim()) return reply.trim();
+    throw new Error((data && data.error) || 'EMPTY');
+  } catch (e) {
+    /* 主通道失败，静默切备用 */
+  }
+
+  // 备用通道一：免 Key 公共接口（OpenAI 兼容格式）
+  try {
+    const res = await fetchWithTimeout(
+      API_CONFIG.fallbackChatUrl,
+      {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          model: API_CONFIG.fallbackModel,
+          messages: payload,
+          referrer: location.hostname || 'github-pages',
+          private: true,
+        }),
+      },
+      API_CONFIG.timeoutMs
+    );
     if (!res.ok) throw new Error('HTTP ' + res.status);
     const data = await res.json();
     const text = data?.choices?.[0]?.message?.content;
     if (!text || !text.trim()) throw new Error('EMPTY');
     return text.trim();
-  } catch (err) {
-    // 备用通道：纯文本 GET 接口
-    const flatPrompt =
-      currentChar.persona +
-      '\n\n以下是我们的对话，请接着回答最后一句：\n' +
-      messages
-        .slice(-6)
-        .map((m) => (m.role === 'user' ? '学生：' : '我：') + m.content)
-        .join('\n');
-    const fallbackUrl =
-      FREE_API.plainUrl +
-      encodeURIComponent(flatPrompt.slice(-1800)) +
-      '?model=' +
-      FREE_API.model +
-      '&referrer=' +
-      encodeURIComponent(location.hostname || 'github-pages');
-
-    const res2 = await fetch(fallbackUrl);
-    if (!res2.ok) {
-      throw new Error('免费接口暂时不可用（' + res2.status + '），稍后再试');
-    }
-    const text2 = await res2.text();
-    if (!text2 || !text2.trim()) throw new Error('免费接口没有返回内容，稍后再试');
-    return text2.trim();
+  } catch (e) {
+    /* 继续走备用通道二 */
   }
+
+  // 备用通道二：纯文本 GET 接口
+  const flatPrompt =
+    currentChar.persona +
+    '\n\n以下是我们的对话，请接着回答最后一句：\n' +
+    messages
+      .slice(-6)
+      .map((m) => (m.role === 'user' ? '学生：' : '我：') + m.content)
+      .join('\n');
+  const fallbackUrl =
+    API_CONFIG.fallbackPlainUrl +
+    encodeURIComponent(flatPrompt.slice(-1800)) +
+    '?model=' +
+    API_CONFIG.fallbackModel +
+    '&referrer=' +
+    encodeURIComponent(location.hostname || 'github-pages');
+
+  const res2 = await fetchWithTimeout(fallbackUrl, {}, API_CONFIG.timeoutMs);
+  if (!res2.ok) throw new Error('接口暂时不可用（' + res2.status + '），稍后再试');
+  const text2 = await res2.text();
+  if (!text2 || !text2.trim()) throw new Error('接口没有返回内容，稍后再试');
+  return text2.trim();
 }
 
 /* ---------------- 发送消息 ---------------- */
