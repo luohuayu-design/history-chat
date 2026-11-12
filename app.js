@@ -28,7 +28,7 @@ const CHARACTERS = [
     years: '1912 — 1997',
     desc: '用实验改写物理学教科书的人，被称为「东方居里夫人」。',
     tags: ['宇称不守恒', 'β 衰变', '哥伦比亚大学'],
-    image: 'realistic cinematic portrait of a Chinese American female experimental physicist in a 1950s Columbia University laboratory, short dark wavy hair, white lab coat, calm confident expression, brass instruments and oscilloscope blurred in background, teal and violet rim lighting, film photography, high detail',
+    image: 'images/wu-jianxiong.jpg',
     greeting:
       '你好，我是吴健雄。\n坐下吧，实验室里没有那么多规矩。今天想聊点什么？是物理，还是你心里正在打转的问题？',
     suggestions: [
@@ -56,9 +56,11 @@ const CHARACTERS = [
 /* ---------------- 工具函数 ---------------- */
 const $ = (sel) => document.querySelector(sel);
 
-// 统一的 AI 生图地址
-function imageUrl(prompt, size = 'square_hd') {
-  return `https://trae-api-cn.mchost.guru/api/ide/v1/text_to_image?prompt=${encodeURIComponent(prompt)}&image_size=${size}`;
+// 人物头像：填本地图片路径（images/xxx.jpg）就直接用；填描述文字则走 AI 生图接口
+function charPhoto(ch, size = 'square_hd') {
+  const v = ch.image || '';
+  if (/^(images\/|\.\/|https?:\/\/)/.test(v)) return v;
+  return `https://trae-api-cn.mchost.guru/api/ide/v1/text_to_image?prompt=${encodeURIComponent(v)}&image_size=${size}`;
 }
 
 const STORAGE_KEY = (id) => `chrono-chat:${id}`;
@@ -116,7 +118,7 @@ function renderCharacters() {
       </div>`;
 
     const img = card.querySelector('img');
-    img.src = imageUrl(ch.image);
+    img.src = charPhoto(ch);
     img.onerror = () => img.remove();
 
     card.addEventListener('click', () => openChat(ch));
@@ -144,7 +146,7 @@ function openChat(ch) {
   $('#chatMeta').innerHTML = `<span class="live"></span>${ch.field} · ${ch.years}`;
 
   const avatar = $('#chatAvatar');
-  avatar.src = imageUrl(ch.image);
+  avatar.src = charPhoto(ch);
   avatar.onerror = () => (avatar.style.visibility = 'hidden');
 
   messages = loadHistory(ch.id) || [{ role: 'assistant', content: ch.greeting }];
@@ -165,7 +167,7 @@ function makeAvatar() {
   const img = document.createElement('img');
   img.className = 'msg-avatar';
   img.alt = currentChar.name;
-  img.src = imageUrl(currentChar.image, 'square');
+  img.src = charPhoto(currentChar, 'square');
   img.onerror = () => {
     img.style.visibility = 'hidden';
   };
