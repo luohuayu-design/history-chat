@@ -229,15 +229,26 @@ function addTyping() {
 
   const bubble = document.createElement('div');
   bubble.className = 'bubble';
-  bubble.innerHTML = '<span class="typing"><i></i><i></i><i></i></span>';
+  bubble.innerHTML =
+    '<span class="typing"><i></i><i></i><i></i></span><span class="elapsed">0.0s</span>';
   wrap.appendChild(bubble);
   $('#messages').appendChild(wrap);
   scrollToBottom();
+
+  // 显示已等待时间，方便判断是网络慢还是模型慢
+  const start = Date.now();
+  wrap._timer = setInterval(() => {
+    const el = bubble.querySelector('.elapsed');
+    if (el) el.textContent = ((Date.now() - start) / 1000).toFixed(1) + 's';
+  }, 100);
 }
 
 function removeTyping() {
   const row = $('#typingRow');
-  if (row) row.remove();
+  if (row) {
+    clearInterval(row._timer);
+    row.remove();
+  }
 }
 
 function renderMessages() {
