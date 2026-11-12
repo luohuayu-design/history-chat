@@ -1,0 +1,65 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+<meta name="description" content="与历史人物对话 —— 跨时空聊天体验" />
+<title>时空对话 · 与历史人物聊天</title>
+<link rel="stylesheet" href="style.css" />
+</head>
+<body>
+  <!-- 背景层：渐变光斑 + 网格 -->
+  <div class="bg-layer" aria-hidden="true">
+    <div class="orb orb-a"></div>
+    <div class="orb orb-b"></div>
+    <div class="orb orb-c"></div>
+    <div class="grid"></div>
+  </div>
+
+  <main id="app">
+    <!-- ===== 人物选择页 ===== -->
+    <section id="selectView" class="view is-active">
+      <header class="hero">
+        <div class="badge"><span class="dot"></span>CHRONO · 时空对话</div>
+        <h1>和<span class="grad">历史人物</span><br />聊一聊</h1>
+        <p class="sub">选择一位人物，跨越时间与 TA 对话。<br class="only-mobile" />每位人物都有自己的性格、口吻与知识边界。</p>
+      </header>
+
+      <div id="charGrid" class="char-grid"></div>
+
+      <footer class="page-foot">
+        <p>示范人物：吴健雄。其余人物位置已预留 —— 在 <code>app.js</code> 顶部 <code>CHARACTERS</code> 里按同样格式添加即可。</p>
+        <p class="dim">由免费公共模型驱动，回答仅供学习参考，可能存在事实偏差。</p>
+      </footer>
+    </section>
+
+    <!-- ===== 聊天页 ===== -->
+    <section id="chatView" class="view">
+      <header class="chat-head">
+        <button id="backBtn" class="icon-btn" title="返回人物列表" aria-label="返回人物列表">←</button>
+        <img id="chatAvatar" class="chat-avatar" alt="" />
+        <div class="chat-title">
+          <div class="chat-name" id="chatName">—</div>
+          <div class="chat-meta" id="chatMeta"><span class="live"></span>已连线</div>
+        </div>
+        <button id="clearBtn" class="ghost-btn">清空</button>
+      </header>
+
+      <div id="messages" class="messages" aria-live="polite"></div>
+
+      <div id="suggestions" class="suggestions"></div>
+
+      <form id="composer" class="composer" autocomplete="off">
+        <textarea id="input" rows="1" placeholder="说点什么…（Enter 发送，Shift+Enter 换行）"></textarea>
+        <button id="sendBtn" type="submit" class="send-btn" title="发送">
+          <span>发送</span>
+        </button>
+      </form>
+    </section>
+  </main>
+
+  <div id="toast" class="toast" role="status"></div>
+
+  <script src="app.js"></script>
+</body>
+</html>
